@@ -1,0 +1,46 @@
+name: Deploy Lambda Function
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # Substitua pelo seu AWS region
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies and build
+        run: |
+          pip install -r requirements.txt -t ./src
+
+      - name: Zip files
+        run: |
+          zip -r lambda-package.zip . -x "*.git*" "*__pycache__*" "*.github*"
+      
+
+      - name: Update Lambda Environment Variables
+        run: |
+          aws lambda update-function-configuration \
+            --function-name sanpon-scraping-lambda \
+            --environment "Variables={AWS_INSTANCE_EC2_ID=${{secrets.AWS_INSTANCE_EC2_ID}}}"
+
+      - name: Deploy Lambda Function
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://lambda-package.zip
